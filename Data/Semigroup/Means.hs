@@ -8,6 +8,9 @@ module Data.Semigroup.Means (
     -- * Harmonic mean
     , HM , hmWeight , hmSum , hm , getHM
 
+    -- * Harmonic mean with zero-value correction
+    , HMZ , hmzWeight , hmzSum , hmz , getHMZ
+
     -- * Quadratic mean
     , QM , qmWeight , qmSum , qm , getQM
 
@@ -19,7 +22,7 @@ module Data.Semigroup.Means (
 
     ) where
 
-import Data.Semigroup
+import           Data.Semigroup
 
 --------------------------------------------------------------------------------
 
@@ -69,10 +72,40 @@ getGM (GM c p) = p ** (1 / fromIntegral c)
 
 --------------------------------------------------------------------------------
 
+-- | semigroup for accumulating /Harmonic mean with zero-value correction/
+data HMZ a = HMZC {
+        hmzWeight :: {-# UNPACK #-} !Int
+    ,   hmzZeros  :: {-# UNPACK #-} !Int
+    ,   hmzSum    :: a
+    }
+           | HMZero {
+        hmzZeros  :: {-# UNPACK #-} !Int
+    }
+    deriving (Show, Eq)
+
+instance Num a => Semigroup (HMZ a) where
+  HMZero  z1    <> HMZero  z2    = HMZero (z1 + z2)
+  HMZC c1 z1 s1 <> HMZero  z2    = HMZC c1 (z1 + z2) s1
+  HMZero  z1    <> HMZC c2 z2 s2 = HMZC c2 (z1 + z2) s2
+  HMZC c1 z1 s1 <> HMZC c2 z2 s2 = HMZC (c1 + c2) (z1 + z2) (s1 + s2)
+  {-# INLINE (<>) #-}
+
+hmz :: (Eq a, Fractional a) => a -> HMZ a
+hmz 0.0 = HMZero 1
+hmz x   = HMZC 1 0 (1 / x)
+{-# INLINABLE hmz #-}
+
+getHMZ :: Fractional a => HMZ a -> a
+getHMZ (HMZero _) = 0.0
+getHMZ (HMZC c z s) = (fromIntegral c / fromIntegral (c+z)) * (fromIntegral c / s)
+{-# INLINABLE getHMZ #-}
+
+--------------------------------------------------------------------------------
+
 -- | semigroup for accumalting /Harmonic mean/
 data HM a = HM {
-        hmWeight  :: {-# UNPACK #-} !Int
-    ,   hmSum     :: a
+        hmWeight :: {-# UNPACK #-} !Int
+    ,   hmSum    :: a
     } deriving (Show, Eq)
 
 hm :: Fractional a => a -> HM a
@@ -91,8 +124,8 @@ getHM (HM c s) = fromIntegral c / s
 
 -- | semigroup for accumalting /Quadratic mean/
 data QM a = QM {
-        qmWeight  :: {-# UNPACK #-} !Int
-    ,   qmSum     :: a
+        qmWeight :: {-# UNPACK #-} !Int
+    ,   qmSum    :: a
     } deriving (Show, Eq)
 
 qm :: Fractional a => a -> QM a
@@ -111,8 +144,8 @@ getQM (QM c s) = sqrt (s / fromIntegral c)
 
 -- | semigroup for accumalting /Cubic mean/
 data CM a = CM {
-        cmWeight  :: {-# UNPACK #-} !Int
-    ,   cmSum     :: a
+        cmWeight :: {-# UNPACK #-} !Int
+    ,   cmSum    :: a
     } deriving (Show, Eq)
 
 cm :: Fractional a => a -> CM a
@@ -131,8 +164,8 @@ getCM (CM c s) = (s / fromIntegral c) ** (1/3)
 
 -- | semigroup for accumalting /Midrange mean/
 data MM a = MM {
-        mmMin  :: a
-    ,   mmMax  :: a
+        mmMin :: a
+    ,   mmMax :: a
     } deriving (Show, Eq)
 
 mm :: a -> MM a
